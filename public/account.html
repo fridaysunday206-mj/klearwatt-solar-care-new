@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#102a24"><title>My account | KlearWatt Solar Care</title><link rel="stylesheet" href="/app.css"></head>
+<body>
+<header><div class="wrap nav"><a class="brand" href="/">Klear<span>Watt</span> Solar Care</a><div><a class="l" href="/">Home</a><a class="l hidden" id="adminLink" href="/admin.html">Admin</a><a class="l hidden" id="logout" href="#">Log out</a></div></div></header>
+<main class="wrap">
+<div id="flash" class="msg hidden" role="status"></div>
+<section id="authBox" class="box hidden" style="max-width:460px;margin:auto">
+ <h1>My account</h1><p class="muted">Track bookings, pay online and download receipts.</p>
+ <div class="tabs"><button id="tL" class="on" type="button">Log in</button><button id="tR" type="button">Create account</button></div>
+ <div id="authErr" class="msg err hidden"></div>
+ <div id="fReg" class="hidden"><div class="field"><label for="rn">Full name</label><input id="rn" autocomplete="name"></div><div class="field"><label for="rp">Phone</label><input id="rp" type="tel" autocomplete="tel"></div></div>
+ <div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email"></div>
+ <div class="field"><label for="pw">Password <span class="muted small" id="pwHint"></span></label><input id="pw" type="password" autocomplete="current-password"></div>
+ <button class="btn dark" id="go" type="button">Log in</button>
+</section>
+<section id="app" class="hidden">
+ <h1 id="hi">Hello</h1><p class="muted">Prices are confirmed by KlearWatt before you can pay online. For help, WhatsApp 09037885738, call 07087942034 or email fridaysunday206@gmail.com.</p>
+ <h2>My bookings</h2><div id="bookings"></div>
+ <details class="box"><summary><b>New booking</b></summary>
+  <div class="row"><div class="field"><label for="bp">Service option</label><select id="bp"></select></div><div class="field"><label for="bpan">Number of panels</label><input id="bpan" type="number" min="1"></div></div>
+  <div class="field"><label for="ba">Address / area in Karu LGA</label><input id="ba"></div>
+  <div class="row"><div class="field"><label for="bd">Preferred date</label><input id="bd" type="date"></div><div class="field"><label for="bacc">Panel location</label><select id="bacc"><option value="">Select</option><option>Ground / easy access</option><option>Low roof</option><option>High roof</option><option>Not sure</option></select></div></div>
+  <div class="field"><label for="bn">Notes</label><textarea id="bn"></textarea></div>
+  <button class="btn dark" id="bgo" type="button">Send booking request</button></details>
+ <h2>Payment history</h2><div class="box tw" id="history"></div>
+</section></main>
+<script src="/app.js"></script>
+<script>
+let mode='login',me=null;
+function setMode(m){mode=m;$('tL').classList.toggle('on',m==='login');$('tR').classList.toggle('on',m==='reg');$('fReg').classList.toggle('hidden',m==='login');$('go').textContent=m==='login'?'Log in':'Create account';$('pwHint').textContent=m==='reg'?'(min. 8 characters)':'';}
+$('tL').onclick=()=>setMode('login');$('tR').onclick=()=>setMode('reg');
+$('go').onclick=async()=>{$('authErr').classList.add('hidden');try{await api(mode==='login'?'/api/login':'/api/register','POST',{email:$('em').value,password:$('pw').value,name:$('rn').value,phone:$('rp').value});location.reload();}catch(e){show('authErr',e.message,'err');}};
+$('logout').onclick=async e=>{e.preventDefault();await api('/api/logout','POST');location.href='/account.html';};
+async function load(){
+ const [bk,py]=await Promise.all([api('/api/bookings'),api('/api/payments')]);
+ $('bookings').innerHTML=bk.length?bk.map(b=>`<div class="box bk"><div><b>${esc(b.plan)}</b> · booking #${b.id}<br><span class="muted small">${esc(b.address||'')}${b.panels?' · '+b.panels+' panels':''} · ${when(b.created_at)}</span><br>${pill(b.status)} ${pill(b.payment_status)}${b.subscription_status?' '+pill('subscription '+b.subscription_status):''}</div><div style="text-align:right"><div><b>${b.amount_kobo?naira(b.amount_kobo)+(b.kind==='subscription'?' / month':''):'Awaiting quote'}</b></div>${b.can_pay?`<button class="btn sm" data-pay="${b.id}">Pay now</button>`:''}</div></div>`).join(''):'<div class="box muted">No bookings yet.</div>';
+ $('history').innerHTML=py.length?`<table><tr><th>Date</th><th>Service</th><th>Amount</th><th>Method</th><th>Status</th><th>Receipt</th></tr>${py.map(p=>`<tr><td>${when(p.paid_at||p.created_at)}</td><td>${esc(p.plan||'-')}</td><td>${naira(p.amount_kobo)}</td><td>${esc(p.method.replace('_',' '))}</td><td>${pill(p.status)}</td><td>${p.status==='success'?`<a href="/api/payments/${p.id}/receipt" target="_blank" rel="noopener"><u>${esc(p.receipt_no)}</u></a>`:'-'}</td></tr>`).join('')}</table>`:'<span class="muted">No payments yet.</span>';
+}
+$('bookings').onclick=async e=>{const id=e.target.dataset&&e.target.dataset.pay;if(!id)return;e.target.disabled=true;e.target.textContent='Please wait…';try{const r=await api(`/api/bookings/${id}/pay`,'POST');location.href=r.authorization_url;}catch(err){show('flash',err.message,'err');e.target.disabled=false;e.target.textContent='Pay now';load();}};
+$('bgo').onclick=async()=>{try{await api('/api/bookings','POST',{plan:$('bp').value,address:$('ba').value,panels:$('bpan').value,date:$('bd').value,access:$('bacc').value,notes:$('bn').value});show('flash','Booking request saved. We will confirm your price and date.','ok');$('ba').value='';$('bn').value='';load();}catch(e){show('flash',e.message,'err');}};
+(async()=>{
+ me=await api('/api/me');
+ if(me.guest){$('authBox').classList.remove('hidden');setMode('login');return;}
+ $('app').classList.remove('hidden');$('logout').classList.remove('hidden');if(me.role==='admin')$('adminLink').classList.remove('hidden');
+ $('hi').textContent='Hello, '+me.name.split(' ')[0];
+ api('/api/packages').then(p=>{$('bp').innerHTML=p.map(x=>`<option>${esc(x.name)}</option>`).join('')});
+ const ref=new URLSearchParams(location.search).get('reference');
+ if(ref){history.replaceState(null,'','/account.html');show('flash','Checking your payment…');
+  try{const p=await api('/api/pay/verify?reference='+encodeURIComponent(ref));
+   if(p.status==='success')show('flash','Payment received. Thank you! Receipt '+p.receipt_no+' is in your payment history.','ok');
+   else if(p.status==='failed')show('flash','The payment failed. You were not charged. Please try again.','err');
+   else if(p.status==='cancelled')show('flash','Payment cancelled. You were not charged.','err');
+   else if(p.status==='flagged')show('flash','We could not match this payment. Please WhatsApp KlearWatt on 09037885738 or call 07087942034.','err');
+   else show('flash','Your payment is still processing. Refresh in a minute.');
+  }catch(e){show('flash',e.message,'err');}}
+ load();
+})();
+</script></body></html>
