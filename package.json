@@ -1,0 +1,8 @@
+{
+  "name": "klearwatt-solar-care",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KlearWatt Solar Care website with Paystack payments (no npm dependencies, Node 22.13+)",
+  "engines": { "node": ">=22.13" },
+  "scripts": { "start": "node server.js", "test": "node test/run.js" }
+}
