@@ -11,6 +11,12 @@
  <h2>Service prices</h2><p class="muted small">Prices are set by you. Subscription packages are billed monthly. After setting a monthly price, press "Create Paystack plan" once. Changing a price needs a new plan (existing subscribers keep their old plan on Paystack).</p><div class="box tw" id="pkgs"></div>
  <h2>Quotation requests</h2><p class="muted small">New residential and commercial enquiries submitted through the public website. Review the site details, agree a price with the customer and update the request status.</p><div class="box tw" id="quotes"></div>
  <h2>Bookings</h2><p class="muted small">Enter the agreed price for one-time jobs. The customer's Pay Now button appears once a price exists.</p><div class="box tw" id="bks"></div>
+ <h2>Job photographs</h2><p class="muted small">Upload genuine before-cleaning and after-cleaning photographs for a booking. Photos are private to the admin dashboard.</p>
+ <div class="box">
+  <div class="row"><div class="field"><label for="photoBooking">Booking</label><select id="photoBooking"></select></div><div class="field"><label for="photoPhase">Photo type</label><select id="photoPhase"><option value="before">Before cleaning</option><option value="after">After cleaning</option></select></div></div>
+  <div class="field"><label for="jobPhoto">Choose photo (JPG, PNG or WebP)</label><input id="jobPhoto" type="file" accept="image/jpeg,image/png,image/webp"></div>
+  <button class="btn dark" id="uploadPhoto" type="button">Upload job photo</button><div id="photoMessage" class="msg hidden" role="status"></div><div id="photoGallery" class="grid"></div>
+ </div>
  <h2>Record cash / bank transfer</h2>
  <div class="box"><div class="row"><div class="field"><label for="mb">Booking</label><select id="mb"></select></div><div class="field"><label for="ma">Amount (₦)</label><input id="ma" type="number" min="1" step="0.01"></div><div class="field"><label for="mm">Method</label><select id="mm"><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option></select></div></div>
  <div class="row"><div class="field"><label for="mr">Transfer/receipt reference (blocks duplicates)</label><input id="mr"></div><div class="field"><label for="mn">Note</label><input id="mn"></div><button class="btn dark" id="mgo" type="button">Record payment</button></div></div>
@@ -28,9 +34,40 @@ async function load(){
  $('quotes').innerHTML=quotes.length?`<table><tr><th>Request</th><th>Customer</th><th>Type / site</th><th>Panels / access</th><th>Location</th><th>Preferred schedule</th><th>Quote (₦)</th><th>Status</th><th></th></tr>${quotes.map(q=>`<tr><td>#${q.id}<br><span class="muted small">${when(q.created_at)}</span></td><td>${esc(q.name)}<br><span class="muted small">${esc(q.phone)}${q.email?'<br>'+esc(q.email):''}${q.organisation?'<br>'+esc(q.organisation):''}</span></td><td>${esc(q.customer_type)}<br><span class="muted small">${esc(q.site_type||'-')}</span></td><td>${q.panel_count||'Not stated'}<br><span class="muted small">${esc(q.mounting||'-')} · ${esc(q.access||'-')}</span></td><td>${esc(q.address)}</td><td>${esc(q.frequency||'-')}<br><span class="muted small">${q.preferred_date ? dateOnly(q.preferred_date) : 'No date'}</span></td><td><input data-quote-price="${q.id}" type="number" min="1" step="0.01" value="${q.quote_kobo==null?'':money(q.quote_kobo)}" placeholder="Not set" style="width:115px"></td><td><select data-quote-status="${q.id}">${['new','reviewing','quoted','accepted','declined'].map(x=>`<option value="${x}"${x===q.status?' selected':''}>${x}</option>`).join('')}</select></td><td><button class="btn dark sm" data-quote-save="${q.id}">Save</button><br><span class="muted small">${esc(q.notes||'')}</span></td></tr>`).join('')}</table>`:'<span class="muted">No quotation requests yet.</span>';
  $('bks').innerHTML=bk.length?`<table><tr><th>#</th><th>Customer</th><th>Service</th><th>Address</th><th>Preferred cleaning date</th><th>Price (₦)</th><th>Status</th><th>Payment</th><th></th></tr>${bk.map(b=>`<tr><td>${b.id}</td><td>${esc(b.customer)}<br><span class="muted small">${esc(b.phone||b.email)}</span></td><td>${esc(b.plan)}</td><td>${esc(b.address)}</td><td>${dateOnly(b.pref_date)}</td><td>${b.kind==='subscription'?naira(b.amount_kobo)+'/mo':`<input data-q="${b.id}" type="number" min="1" step="0.01" value="${money(b.quote_kobo)}" style="width:120px">`}</td><td><select data-s="${b.id}">${['requested','confirmed','completed','cancelled'].map(x=>`<option${x===b.status?' selected':''}>${x}</option>`).join('')}</select></td><td>${pill(b.payment_status)}</td><td><button class="btn dark sm" data-bsave="${b.id}">Save</button></td></tr>`).join('')}</table>`:'<span class="muted">No bookings yet.</span>';
  $('mb').innerHTML=bk.map(b=>`<option value="${b.id}">#${b.id} ${esc(b.customer)} - ${esc(b.plan)}</option>`).join('');
+ $('photoBooking').innerHTML=bk.map(b=>`<option value="${b.id}">#${b.id} ${esc(b.customer)} - ${esc(b.plan)}</option>`).join('');
+ await loadJobPhotos();
  $('txs').innerHTML=tx.length?`<table><tr><th>Date</th><th>Customer</th><th>Service</th><th>Amount</th><th>Method</th><th>Status</th><th>Reference</th><th>Receipt</th><th></th></tr>${tx.map(p=>`<tr><td>${when(p.paid_at||p.created_at)}</td><td>${esc(p.customer||'')}</td><td>${esc(p.plan||'')}</td><td>${naira(p.amount_kobo)}</td><td>${esc(p.method.replace('_',' '))}</td><td>${pill(p.status)}${p.note?`<br><span class="muted small">${esc(p.note)}</span>`:''}</td><td class="small">${esc(p.reference)}</td><td>${p.status==='success'?`<a href="/api/payments/${p.id}/receipt" target="_blank" rel="noopener"><u>${esc(p.receipt_no)}</u></a>`:''}</td><td>${p.method==='paystack'&&['pending','flagged','failed','cancelled'].includes(p.status)?`<button class="btn sm" data-ver="${esc(p.reference)}">Re-check</button>`:''}</td></tr>`).join('')}</table>`:'<span class="muted">No transactions yet.</span>';
 }
 const run=async f=>{try{await f();show('flash','Saved.','ok');await load();}catch(e){show('flash',e.message,'err');}};
+async function loadJobPhotos(){
+ const id=$('photoBooking').value;
+ if(!id){$('photoGallery').innerHTML='<span class="muted">Create a booking before uploading job photos.</span>';return;}
+ try{
+  const photos=await api('/api/admin/bookings/'+id+'/photos');
+  $('photoGallery').innerHTML=photos.length?photos.map(p=>`<div class="box"><b>${p.phase==='before'?'Before cleaning':'After cleaning'}</b><br><img src="/api/admin/job-photos/${p.id}" alt="${p.phase} cleaning photo" loading="lazy" style="width:100%;max-width:320px;border-radius:9px;margin-top:8px"><div class="muted small">${when(p.uploaded_at)}</div></div>`).join(''):'<span class="muted">No job photos uploaded for this booking yet.</span>';
+ }catch(e){show('photoMessage',e.message,'err');}
+}
+$('photoBooking').addEventListener('change',loadJobPhotos);
+$('uploadPhoto').onclick=async()=>{
+ const file=$('jobPhoto').files[0], booking=$('photoBooking').value, phase=$('photoPhase').value;
+ if(!booking){show('photoMessage','Choose a booking first.','err');return;}
+ if(!file){show('photoMessage','Choose a photo first.','err');return;}
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)){show('photoMessage','Choose a JPG, PNG or WebP image.','err');return;}
+ const button=$('uploadPhoto');button.disabled=true;button.textContent='Preparing photo…';
+ try{
+  const data=await new Promise((resolve,reject)=>{
+   const reader=new FileReader();reader.onerror=()=>reject(new Error('Could not read this photo.'));
+   reader.onload=()=>{const img=new Image();img.onerror=()=>reject(new Error('This image could not be opened.'));
+    img.onload=()=>{const scale=Math.min(1,1400/Math.max(img.width,img.height));const canvas=document.createElement('canvas');canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',0.78));};img.src=reader.result;};
+   reader.readAsDataURL(file);
+  });
+  if(data.length>2450000)throw new Error('This photo is still too large. Please choose a smaller image.');
+  button.textContent='Uploading…';
+  await api('/api/admin/bookings/'+booking+'/photos','POST',{phase,data});
+  $('jobPhoto').value='';show('photoMessage','Photo uploaded successfully.','ok');await loadJobPhotos();
+ }catch(e){show('photoMessage',e.message,'err');}
+ finally{button.disabled=false;button.textContent='Upload job photo';}
+};
 document.addEventListener('click',e=>{const d=e.target.dataset;if(!d)return;
  if(d.save)run(()=>api('/api/admin/packages/'+d.save,'PUT',{price_naira:document.querySelector(`[data-p="${d.save}"]`).value,kind:document.querySelector(`[data-k="${d.save}"]`).value}));
  if(d.quoteSave)run(()=>api('/api/admin/quote-requests/'+d.quoteSave,'PATCH',{quote_naira:document.querySelector(`[data-quote-price="${d.quoteSave}"]`).value,status:document.querySelector(`[data-quote-status="${d.quoteSave}"]`).value}));
