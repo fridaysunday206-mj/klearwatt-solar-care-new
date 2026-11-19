@@ -302,6 +302,12 @@ route('POST', '/api/admin/bookings/:id/photos', 'admin', c => {
   if (!match) throw new HttpError(400, 'Choose a JPG, PNG or WebP image.');
   const data = Buffer.from(match[2], 'base64');
   if (!data.length || data.length > 1800000) throw new HttpError(413, 'Photo is too large. Choose a smaller image.');
+  const validImage = match[1] === 'image/jpeg'
+    ? data[0] === 0xff && data[1] === 0xd8 && data[data.length - 2] === 0xff && data[data.length - 1] === 0xd9
+    : match[1] === 'image/png'
+      ? data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      : data.length >= 12 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP';
+  if (!validImage) throw new HttpError(400, 'The selected file is not a valid image.');
   const idPhoto = db.prepare('INSERT INTO job_photos(booking_id,phase,mime,data,uploaded_at) VALUES(?,?,?,?,?)').run(id, phase, match[1], data, now()).lastInsertRowid;
   return { ok: true, photo_id: idPhoto };
 });
