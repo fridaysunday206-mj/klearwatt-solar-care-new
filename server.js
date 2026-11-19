@@ -196,6 +196,16 @@ route('POST', '/api/bookings', 'user', c => {
   return shapeBooking(db.prepare(BK + ' WHERE b.id=?').get(id));
 });
 route('GET', '/api/bookings', 'user', c => db.prepare(BK + ' WHERE b.user_id=? ORDER BY b.id DESC').all(c.u.id).map(shapeBooking));
+route('GET', '/api/bookings/:id/photos', 'user', c => {
+  const id = +c.m[1];
+  if (!db.prepare('SELECT 1 FROM bookings WHERE id=? AND user_id=?').get(id, c.u.id)) throw new HttpError(404, 'Booking not found');
+  return db.prepare('SELECT id,phase,mime,uploaded_at FROM job_photos WHERE booking_id=? ORDER BY id').all(id);
+});
+route('GET', '/api/job-photos/:id', 'user', c => {
+  const p = db.prepare('SELECT p.mime,p.data,b.user_id FROM job_photos p JOIN bookings b ON b.id=p.booking_id WHERE p.id=?').get(+c.m[1]);
+  if (!p || (p.user_id !== c.u.id && c.u.role !== 'admin')) throw new HttpError(404, 'Photo not found');
+  return { image: p };
+});
 route('GET', '/api/payments', 'user', c => db.prepare('SELECT y.*, p.name plan FROM payments y LEFT JOIN bookings b ON b.id=y.booking_id LEFT JOIN packages p ON p.id=b.package_id WHERE y.user_id=? AND y.status<>\'pending\' ORDER BY y.id DESC').all(c.u.id).map(shapePay));
 
 // Pay Now: the amount is ALWAYS taken from the database, never from the browser.
