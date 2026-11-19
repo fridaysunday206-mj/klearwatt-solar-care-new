@@ -288,7 +288,7 @@ route('POST', '/api/admin/bookings/:id/photos', 'admin', c => {
   if (!db.prepare('SELECT 1 FROM bookings WHERE id=?').get(id)) throw new HttpError(404, 'Booking not found');
   const phase = c.data.phase;
   if (!['before','after'].includes(phase)) throw new HttpError(400, 'Choose before-cleaning or after-cleaning.');
-  const match = /^data:(image\\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(String(c.data.data || ''));
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(String(c.data.data || ''));
   if (!match) throw new HttpError(400, 'Choose a JPG, PNG or WebP image.');
   const data = Buffer.from(match[2], 'base64');
   if (!data.length || data.length > 1800000) throw new HttpError(413, 'Photo is too large. Choose a smaller image.');
