@@ -139,7 +139,6 @@ async function modernSignedHook(ev, data, { offset = 0, multiple = false, goodSi
   ok((await cu('GET', '/api/bookings/' + b1.id + '/photos')).j.length === 2, 'customer can list photos attached to own booking');
   ok((await other('GET', '/api/bookings/' + b1.id + '/photos')).s === 404, 'another customer cannot list someone else\'s job photos');
   ok((await other('GET', '/api/job-photos/' + photoBefore.j.photo_id)).s === 404, 'another customer cannot view someone else\'s photo');
-  const imageResponse = await fetch(BASE + '/api/job-photos/' + photoBefore.j.photo_id, { headers: { cookie: (await cu('GET', '/api/me')).j ? '' : '' } });
   const customerImage = await cu('GET', '/api/job-photos/' + photoBefore.j.photo_id);
   ok(customerImage.s === 200 && customerImage.j.html && customerImage.j.html.length > 0, 'customer photo endpoint returns the stored image bytes');
   ok((await cu('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'before', data: photoData })).s === 403, 'customer cannot upload job photos');
