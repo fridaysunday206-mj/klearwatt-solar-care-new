@@ -382,6 +382,13 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: code === 500 ? 'Server error' : e.message }));
   }
 });
-if (E('ADMIN_EMAIL') && E('ADMIN_PASSWORD') && !db.prepare('SELECT 1 FROM users WHERE email=?').get(E('ADMIN_EMAIL').toLowerCase()))
-  db.prepare("INSERT INTO users(name,email,pass,role,created_at) VALUES('Admin',?,?,'admin',?)").run(E('ADMIN_EMAIL').toLowerCase(), hash(E('ADMIN_PASSWORD')), now());
+if (E('ADMIN_EMAIL') && E('ADMIN_PASSWORD')) {
+  const adminEmail = E('ADMIN_EMAIL').trim().toLowerCase();
+  const existingAdmin = db.prepare('SELECT id FROM users WHERE email=?').get(adminEmail);
+  if (existingAdmin) {
+    db.prepare("UPDATE users SET role='admin' WHERE id=?").run(existingAdmin.id);
+  } else {
+    db.prepare("INSERT INTO users(name,email,pass,role,created_at) VALUES('Admin',?,?,'admin',?)").run(adminEmail, hash(E('ADMIN_PASSWORD')), now());
+  }
+}
 server.listen(PORT, () => console.log(`KlearWatt running on ${APP_URL}  (Paystack: ${E('PAYSTACK_SECRET_KEY') ? (E('PAYSTACK_SECRET_KEY').startsWith('sk' + '_' + 'live' + '_') ? 'LIVE' : 'test') : 'NOT configured'})`));
