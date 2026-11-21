@@ -33,7 +33,18 @@ $('go').onclick=async()=>{$('authErr').classList.add('hidden');try{await api(mod
 $('logout').onclick=async e=>{e.preventDefault();await api('/api/logout','POST');location.href='/account.html';};
 async function load(){
  const [bk,py]=await Promise.all([api('/api/bookings'),api('/api/payments')]);
- $('bookings').innerHTML=bk.length?bk.map(b=>`<div class="box bk"><div><b>${esc(b.plan)}</b> · booking #${b.id}<br><span class="muted small">${esc(b.address||'')}${b.panels?' · '+b.panels+' panels':''} · ${when(b.created_at)}</span><br>${pill(b.status)} ${pill(b.payment_status)}${b.subscription_status?' '+pill('subscription '+b.subscription_status):''}</div><div style="text-align:right"><div><b>${b.amount_kobo?naira(b.amount_kobo)+(b.kind==='subscription'?' / month':''):'Awaiting quote'}</b></div>${b.can_pay?`<button class="btn sm" data-pay="${b.id}">Pay now</button>`:''}</div></div>`).join(''):'<div class="box muted">No bookings yet.</div>';
+ $('bookings').innerHTML=bk.length?bk.map(b=>`<div class="box bk" data-booking="${b.id}"><div><b>${esc(b.plan)}</b> · booking #${b.id}<br><span class="muted small">${esc(b.address||'')}${b.panels?' · '+b.panels+' panels':''}${b.pref_date?' · Preferred cleaning date: '+dateOnly(b.pref_date):''} · Requested ${when(b.created_at)}</span><br>${pill(b.status)} ${pill(b.payment_status)}${b.subscription_status?' '+pill('subscription '+b.subscription_status):''}</div><div style="text-align:right"><div><b>${b.amount_kobo?naira(b.amount_kobo)+(b.kind==='subscription'?' / month':''):'Awaiting quote'}</b></div>${b.can_pay?`<button class="btn sm" data-pay="${b.id}">Pay now</button>`:''}</div></div>`).join(''):'<div class="box muted">No bookings yet.</div>';
+ await Promise.all(bk.map(async b=>{
+  try{
+   const photos=await api('/api/bookings/'+b.id+'/photos');
+   const card=document.querySelector(`[data-booking="${b.id}"]`);
+   if(card&&photos.length){
+    const gallery=document.createElement('div');gallery.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%;margin-top:10px';
+    gallery.innerHTML=photos.map(p=>`<figure style="margin:0;width:min(46%,220px)"><img src="/api/job-photos/${p.id}" alt="${p.phase==='before'?'Before cleaning':'After cleaning'}" loading="lazy" style="width:100%;border-radius:8px;display:block"><figcaption class="muted small">${p.phase==='before'?'Before cleaning':'After cleaning'} · ${dateOnly(p.uploaded_at)}</figcaption></figure>`).join('');
+    card.appendChild(gallery);
+   }
+  }catch(e){/* Photo history is optional; booking details remain available. */}
+ }));
  $('history').innerHTML=py.length?`<table><tr><th>Date</th><th>Service</th><th>Amount</th><th>Method</th><th>Status</th><th>Receipt</th></tr>${py.map(p=>`<tr><td>${when(p.paid_at||p.created_at)}</td><td>${esc(p.plan||'-')}</td><td>${naira(p.amount_kobo)}</td><td>${esc(p.method.replace('_',' '))}</td><td>${pill(p.status)}</td><td>${p.status==='success'?`<a href="/api/payments/${p.id}/receipt" target="_blank" rel="noopener"><u>${esc(p.receipt_no)}</u></a>`:'-'}</td></tr>`).join('')}</table>`:'<span class="muted">No payments yet.</span>';
 }
 $('bookings').onclick=async e=>{const id=e.target.dataset&&e.target.dataset.pay;if(!id)return;e.target.disabled=true;e.target.textContent='Please wait…';try{const r=await api(`/api/bookings/${id}/pay`,'POST');location.href=r.authorization_url;}catch(err){show('flash',err.message,'err');e.target.disabled=false;e.target.textContent='Pay now';load();}};

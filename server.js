@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS packages(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT
 CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), package_id INTEGER NOT NULL REFERENCES packages(id), address TEXT, panels INTEGER, pref_date TEXT, access TEXT, notes TEXT, amount_kobo INTEGER, status TEXT NOT NULL DEFAULT 'requested', payment_status TEXT NOT NULL DEFAULT 'unpaid', plan_code TEXT, subscription_code TEXT, subscription_status TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY, reference TEXT UNIQUE NOT NULL, booking_id INTEGER REFERENCES bookings(id), user_id INTEGER REFERENCES users(id), amount_kobo INTEGER NOT NULL, method TEXT NOT NULL, status TEXT NOT NULL, auth_url TEXT, receipt_no TEXT UNIQUE, note TEXT, gateway_id TEXT, paid_at TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS webhook_events(key TEXT PRIMARY KEY, type TEXT, received_at TEXT);
-CREATE TABLE IF NOT EXISTS quote_requests(id INTEGER PRIMARY KEY, customer_type TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, email TEXT, organisation TEXT, site_type TEXT, panel_count INTEGER, mounting TEXT, access TEXT, address TEXT NOT NULL, frequency TEXT, preferred_date TEXT, notes TEXT, status TEXT NOT NULL DEFAULT 'new', quote_kobo INTEGER, created_at TEXT NOT NULL, updated_at TEXT);`);
+CREATE TABLE IF NOT EXISTS quote_requests(id INTEGER PRIMARY KEY, customer_type TEXT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, email TEXT, organisation TEXT, site_type TEXT, panel_count INTEGER, mounting TEXT, access TEXT, address TEXT NOT NULL, frequency TEXT, preferred_date TEXT, notes TEXT, status TEXT NOT NULL DEFAULT 'new', quote_kobo INTEGER, created_at TEXT NOT NULL, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS job_photos(id INTEGER PRIMARY KEY, booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE, phase TEXT NOT NULL CHECK(phase IN ('before','after')), mime TEXT NOT NULL CHECK(mime IN ('image/jpeg','image/png','image/webp')), data BLOB NOT NULL, uploaded_at TEXT NOT NULL);`);
 // Prices are NOT invented: they start empty and are set by the admin.
 for (const [n, k, f] of [['Every two weeks', 'subscription', 'biweekly'], ['Weekly', 'subscription', 'weekly'], ['One-time cleaning', 'one_time', 'once']])
   db.prepare('INSERT OR IGNORE INTO packages(name,kind,frequency) VALUES(?,?,?)').run(n, k, f);
@@ -195,6 +196,16 @@ route('POST', '/api/bookings', 'user', c => {
   return shapeBooking(db.prepare(BK + ' WHERE b.id=?').get(id));
 });
 route('GET', '/api/bookings', 'user', c => db.prepare(BK + ' WHERE b.user_id=? ORDER BY b.id DESC').all(c.u.id).map(shapeBooking));
+route('GET', '/api/bookings/:id/photos', 'user', c => {
+  const id = +c.m[1];
+  if (!db.prepare('SELECT 1 FROM bookings WHERE id=? AND user_id=?').get(id, c.u.id)) throw new HttpError(404, 'Booking not found');
+  return db.prepare('SELECT id,phase,mime,uploaded_at FROM job_photos WHERE booking_id=? ORDER BY id').all(id);
+});
+route('GET', '/api/job-photos/:id', 'user', c => {
+  const p = db.prepare('SELECT p.mime,p.data,b.user_id FROM job_photos p JOIN bookings b ON b.id=p.booking_id WHERE p.id=?').get(+c.m[1]);
+  if (!p || (p.user_id !== c.u.id && c.u.role !== 'admin')) throw new HttpError(404, 'Photo not found');
+  return { image: p };
+});
 route('GET', '/api/payments', 'user', c => db.prepare('SELECT y.*, p.name plan FROM payments y LEFT JOIN bookings b ON b.id=y.booking_id LEFT JOIN packages p ON p.id=b.package_id WHERE y.user_id=? AND y.status<>\'pending\' ORDER BY y.id DESC').all(c.u.id).map(shapePay));
 
 // Pay Now: the amount is ALWAYS taken from the database, never from the browser.
@@ -276,6 +287,35 @@ route('POST', '/api/admin/packages/:id/sync-plan', 'admin', async c => { // crea
 });
 route('GET', '/api/admin/bookings', 'admin', () => db.prepare(BK.replace('SELECT b.*,', 'SELECT u.name cname,u.phone cphone,u.email cemail,b.*,').replace('JOIN packages p', 'JOIN users u ON u.id=b.user_id JOIN packages p') + ' ORDER BY b.id DESC LIMIT 500').all().map(b => ({ ...shapeBooking(b), customer: b.cname, phone: b.cphone, email: b.cemail, quote_kobo: b.amount_kobo })));
 route('GET', '/api/admin/quote-requests', 'admin', () => db.prepare('SELECT * FROM quote_requests ORDER BY id DESC LIMIT 500').all());
+// Job photos are stored in SQLite so they follow the database onto its persistent Railway volume.
+route('GET', '/api/admin/bookings/:id/photos', 'admin', c => {
+  const id = +c.m[1];
+  if (!db.prepare('SELECT 1 FROM bookings WHERE id=?').get(id)) throw new HttpError(404, 'Booking not found');
+  return db.prepare('SELECT id,phase,mime,uploaded_at FROM job_photos WHERE booking_id=? ORDER BY id').all(id);
+});
+route('POST', '/api/admin/bookings/:id/photos', 'admin', c => {
+  const id = +c.m[1];
+  if (!db.prepare('SELECT 1 FROM bookings WHERE id=?').get(id)) throw new HttpError(404, 'Booking not found');
+  const phase = c.data.phase;
+  if (!['before','after'].includes(phase)) throw new HttpError(400, 'Choose before-cleaning or after-cleaning.');
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(String(c.data.data || ''));
+  if (!match) throw new HttpError(400, 'Choose a JPG, PNG or WebP image.');
+  const data = Buffer.from(match[2], 'base64');
+  if (!data.length || data.length > 1800000) throw new HttpError(413, 'Photo is too large. Choose a smaller image.');
+  const validImage = match[1] === 'image/jpeg'
+    ? data[0] === 0xff && data[1] === 0xd8 && data[data.length - 2] === 0xff && data[data.length - 1] === 0xd9
+    : match[1] === 'image/png'
+      ? data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      : data.length >= 12 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP';
+  if (!validImage) throw new HttpError(400, 'The selected file is not a valid image.');
+  const idPhoto = db.prepare('INSERT INTO job_photos(booking_id,phase,mime,data,uploaded_at) VALUES(?,?,?,?,?)').run(id, phase, match[1], data, now()).lastInsertRowid;
+  return { ok: true, photo_id: idPhoto };
+});
+route('GET', '/api/admin/job-photos/:id', 'admin', c => {
+  const p = db.prepare('SELECT mime,data FROM job_photos WHERE id=?').get(+c.m[1]);
+  if (!p) throw new HttpError(404, 'Photo not found');
+  return { image: p };
+});
 route('PATCH', '/api/admin/quote-requests/:id', 'admin', c => {
   const q = db.prepare('SELECT * FROM quote_requests WHERE id=?').get(+c.m[1]); if (!q) throw new HttpError(404, 'Quotation request not found');
   const allowed = ['new', 'reviewing', 'quoted', 'accepted', 'declined'];
@@ -308,7 +348,7 @@ route('POST', '/api/admin/payments/manual', 'admin', c => { // cash / bank trans
 
 // ---------- server ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon' };
-const readBody = req => new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', d => { n += d.length; if (n > 2e5) { no(new HttpError(413, 'Too large')); req.destroy(); } else ch.push(d); }); req.on('end', () => ok(Buffer.concat(ch))); req.on('error', no); });
+const readBody = req => new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', d => { n += d.length; if (n > 2.5e6) { no(new HttpError(413, 'Too large')); req.destroy(); } else ch.push(d); }); req.on('end', () => ok(Buffer.concat(ch))); req.on('error', no); });
 const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY'); res.setHeader('Referrer-Policy', 'same-origin');
   try {
@@ -328,6 +368,7 @@ const server = http.createServer(async (req, res) => {
       const hdr = {};
       const out = await r.fn({ req, u, m: url.pathname.match(r.re), q: url.searchParams, data, raw, hdr });
       if (out && out.html) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(out.html); }
+      if (out && out.image) { res.writeHead(200, { 'Content-Type': out.image.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }); return res.end(out.image.data); }
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...hdr }); return res.end(JSON.stringify(out || {}));
     }
     let p = decodeURIComponent(url.pathname); if (p === '/') p = '/index.html';

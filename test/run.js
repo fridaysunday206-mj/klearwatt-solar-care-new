@@ -126,6 +126,24 @@ async function modernSignedHook(ev, data, { offset = 0, multiple = false, goodSi
   const sum = (await admin('GET', '/api/admin/summary')).j; ok(sum.collected_kobo > 0 && sum.test_mode === true, 'admin summary and test-mode flag work');
   ok((await admin('GET', '/api/admin/payments')).j.length >= 8, 'admin sees all transactions');
 
+  console.log('Booking dates and job photographs');
+  const dated = await cu('POST', '/api/bookings', { plan: 'One-time cleaning', address: 'Masaka', date: '2026-12-05' });
+  ok(dated.s === 200 && dated.j.pref_date === '2026-12-05' && (await cu('GET', '/api/bookings')).j.find(b => b.id === dated.j.id).pref_date === '2026-12-05', 'requested calendar date is saved and returned unchanged');
+  const photoData = 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64');
+  const photoBefore = await admin('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'before', data: photoData });
+  ok(photoBefore.s === 200 && photoBefore.j.photo_id, 'admin can upload a before-cleaning photo');
+  const photoAfter = await admin('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'after', data: photoData });
+  ok(photoAfter.s === 200 && photoAfter.j.photo_id, 'admin can upload an after-cleaning photo');
+  const photoList = await admin('GET', '/api/admin/bookings/' + b1.id + '/photos');
+  ok(photoList.s === 200 && photoList.j.length === 2 && photoList.j.some(p => p.phase === 'before') && photoList.j.some(p => p.phase === 'after'), 'admin can list both job photo stages');
+  ok((await cu('GET', '/api/bookings/' + b1.id + '/photos')).j.length === 2, 'customer can list photos attached to own booking');
+  ok((await other('GET', '/api/bookings/' + b1.id + '/photos')).s === 404, 'another customer cannot list someone else\'s job photos');
+  ok((await other('GET', '/api/job-photos/' + photoBefore.j.photo_id)).s === 404, 'another customer cannot view someone else\'s photo');
+  const customerImage = await cu('GET', '/api/job-photos/' + photoBefore.j.photo_id);
+  ok(customerImage.s === 200 && customerImage.j.html && customerImage.j.html.length > 0, 'customer photo endpoint returns the stored image bytes');
+  ok((await cu('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'before', data: photoData })).s === 403, 'customer cannot upload job photos');
+  ok((await admin('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'sideways', data: photoData })).s === 400, 'invalid photo stage is rejected');
+  ok((await admin('POST', '/api/admin/bookings/' + b1.id + '/photos', { phase: 'before', data: 'data:image/jpeg;base64,YWJj' })).s === 400, 'invalid image bytes are rejected');
   console.log('Secrets');
   const files = fs.readdirSync(path.join(__dirname, '..', 'public')).filter(f => fs.statSync(path.join(__dirname, '..', 'public', f)).isFile()).map(f => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8')).join('');
   ok(!files.includes('sk_') && !/PAYSTACK_SECRET|PAYSTACK_WEBHOOK_SECRET|whsec_/.test(files), 'no Paystack secret or secret-variable name in any public file');
