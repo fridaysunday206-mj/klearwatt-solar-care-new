@@ -362,11 +362,43 @@ footer .copyright{border-color:rgba(255,255,255,.14);margin-top:36px;padding-top
   .hero-visual figcaption{font-size:.72rem;text-align:center}
 }
 
+
+/* Mobile usability refinements identified during full-page review */
+header{background:#fff!important}
+.mobile-menu-toggle{
+ display:none;border:1px solid #dce6dc;background:#f5f8f3;color:#103b29;
+ width:40px;height:40px;border-radius:10px;font-size:1.2rem;font-weight:800;
+ align-items:center;justify-content:center;cursor:pointer
+}
+@media(max-width:680px){
+ .topbar{padding:8px 0}
+ .topbar .wrap{display:flex;flex-wrap:nowrap;justify-content:center;gap:0;text-align:center}
+ .topbar .wrap>span:first-child{display:none}
+ .topbar .wrap>span:last-child{display:block;white-space:nowrap;font-size:.69rem;letter-spacing:0}
+ .nav{position:relative;height:64px;gap:9px}
+ .brand{font-size:1.02rem;gap:7px;white-space:nowrap}
+ .brand:before{width:31px;height:31px;border-radius:9px;font-size:.95rem}
+ .mobile-menu-toggle{display:inline-flex;flex:0 0 38px;width:38px;height:38px}
+ .nav>.btn{padding:9px 11px;font-size:.78rem;white-space:nowrap}
+ .navlinks{
+   display:none;position:absolute;top:100%;left:0;right:0;z-index:40;
+   flex-direction:column;align-items:stretch;gap:0;
+   padding:9px 16px 13px;background:#fff;
+   border:1px solid #e1e9df;border-top:0;
+   border-radius:0 0 14px 14px;
+   box-shadow:0 15px 28px rgba(9,41,28,.14)
+ }
+ header.menu-open .navlinks{display:flex}
+ .navlinks a{display:block;padding:12px 3px;border-bottom:1px solid #edf1ec;font-size:.91rem}
+ .navlinks a:last-child{border-bottom:0}
+ #plans .cards{grid-template-columns:1fr!important}
+}
+
 </style>
 </head>
 <body>
 <div class="topbar"><div class="wrap"><span>Professional solar panel cleaning · Karu LGA and surrounding communities</span><span>Call <a href="tel:07087942034">07087942034</a> · WhatsApp <a href="https://wa.me/2349037885738" target="_blank" rel="noopener">09037885738</a></span></div></div>
-<header><div class="wrap nav"><a class="brand" href="/">KlearWatt <span>Solar Care</span></a><nav class="navlinks" aria-label="Main navigation"><a href="#customers">Who we serve</a><a href="#process">Our process</a><a href="#plans">Cleaning options</a><a href="#quote">Request a quote</a><a href="/account.html">My account</a></nav><a class="btn small" href="#quote">Get a quote</a></div></header>
+<header><div class="wrap nav"><a class="brand" href="/">KlearWatt <span>Solar Care</span></a><button class="mobile-menu-toggle" type="button" aria-label="Open navigation menu" aria-controls="mainNav" aria-expanded="false">☰</button><nav class="navlinks" id="mainNav" aria-label="Main navigation"><a href="#customers">Who we serve</a><a href="#process">Our process</a><a href="#plans">Cleaning options</a><a href="#quote">Request a quote</a><a href="/account.html">My account</a></nav><a class="btn small" href="#quote">Get a quote</a></div></header>
 <main>
 <section class="hero"><div class="wrap hero-grid"><div><div class="eyebrow">Specialists in solar panel cleaning</div><h1>Cleaner panels.<br>Care for your investment.</h1><p>Professional solar panel cleaning for homes and businesses. From a few rooftop panels to large commercial installations, KlearWatt makes it easier to request a clear quote and arrange careful, scheduled cleaning.</p><div class="actions"><a class="btn gold" href="#quote" data-customer="residential">Request a cleaning quote</a><a class="btn light" href="#customers">Explore our services</a></div><p class="hero-note">Residential · Commercial · Large installations · Solar farms</p><div class="trustline"><span>Clear quotations</span><span>Appointments agreed in advance</span><span>Clear service scope</span></div></div><figure class="hero-visual"><img src="/images/before-after.jpg" alt="Illustrative before-and-after comparison of dusty and clean solar panels" width="1672" height="740" fetchpriority="high"><figcaption>Illustrative promotional image, not a photograph of a KlearWatt customer job.</figcaption></figure></div></section>
 <section class="section" id="customers"><div class="wrap"><div class="section-head"><div class="eyebrow green-eyebrow">Who we serve</div><h2>Cleaning support for homes and businesses.</h2><p>Choose the service path that best describes your property. Large or complex sites receive an individually prepared quotation after we understand the installation and access requirements.</p></div><div class="choice-grid"><article class="choice"><div class="choice-art" role="img" aria-label="Solar panel cleaning for homes"><img src="/images/residential-commercial.png" alt="Solar panels for residential cleaning" loading="lazy"></div><div class="choice-body"><div class="eyebrow green-eyebrow">For households</div><h3>Residential solar cleaning</h3><p>For homes, apartments and residential properties with rooftop or ground-mounted solar panels.</p><ul><li>One-time cleaning requests</li><li>Scheduled cleaning arrangements</li><li>Clear pricing before work begins</li></ul><a class="btn" href="#quote" data-customer="residential">Request residential quote</a></div></article><article class="choice"><div class="choice-art" role="img" aria-label="Solar panel cleaning for businesses"><img src="/images/residential-commercial.png" alt="Solar panels for commercial cleaning" loading="lazy"></div><div class="choice-body"><div class="eyebrow green-eyebrow">For organisations</div><h3>Commercial solar cleaning</h3><p>For offices, shops, schools, hotels, factories, institutions and large solar installations.</p><ul><li>Small and medium business sites</li><li>Large commercial arrays and solar farms</li><li>Custom quotations and site assessments</li></ul><a class="btn" href="#quote" data-customer="commercial">Request commercial quote</a></div></article></div></div></section>
@@ -378,6 +410,24 @@ footer .copyright{border-color:rgba(255,255,255,.14);margin-top:36px;padding-top
 </main>
 <footer><div class="wrap"><div class="footgrid"><div><div class="foot-title">KlearWatt Solar Care</div><p class="foot-muted">Professional solar panel cleaning for residential and commercial customers.</p></div><div><strong>Contact</strong><p class="foot-muted">Phone: <a href="tel:07087942034">07087942034</a><br>WhatsApp: <a href="https://wa.me/2349037885738">09037885738</a><br>Email: <a href="mailto:fridaysunday206@gmail.com">fridaysunday206@gmail.com</a></p></div><div><strong>Quick links</strong><p class="foot-muted"><a href="#customers">Our customers</a><br><a href="#process">Our process</a><br><a href="/account.html">My account</a></p></div></div><div class="copyright">© <span id="year"></span> KlearWatt Solar Care · Karu LGA, Nasarawa State.</div></div></footer>
 <script>
+
+const menuButton=document.querySelector('.mobile-menu-toggle');
+const siteHeader=document.querySelector('header');
+if(menuButton&&siteHeader){
+ menuButton.addEventListener('click',()=>{
+  const open=siteHeader.classList.toggle('menu-open');
+  menuButton.setAttribute('aria-expanded',String(open));
+  menuButton.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu');
+  menuButton.textContent=open?'×':'☰';
+ });
+ document.querySelectorAll('#mainNav a').forEach(link=>link.addEventListener('click',()=>{
+  siteHeader.classList.remove('menu-open');
+  menuButton.setAttribute('aria-expanded','false');
+  menuButton.setAttribute('aria-label','Open navigation menu');
+  menuButton.textContent='☰';
+ }));
+}
+
 const form=document.getElementById('quoteForm'), message=document.getElementById('formMessage'), tabs=[...document.querySelectorAll('[data-tab]')];
 document.getElementById('year').textContent=new Date().getFullYear();
 function setCustomer(type){document.getElementById('customerType').value=type;tabs.forEach(b=>{const active=b.dataset.tab===type;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));});document.querySelectorAll('.commercial-only').forEach(e=>e.style.display=type==='commercial'?'flex':'none');}
