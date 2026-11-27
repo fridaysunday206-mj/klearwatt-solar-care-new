@@ -352,6 +352,16 @@ footer .copyright{border-color:rgba(255,255,255,.14);margin-top:36px;padding-top
  .tabs button{font-size:.84rem}
 }
 
+
+/* Mobile hero correction: keep copy and promotional image in a clean vertical flow */
+@media(max-width:680px){
+  .hero-grid{grid-template-columns:1fr!important;align-items:start}
+  .hero-grid>div{min-width:0}
+  .hero-visual{width:100%;max-width:100%;margin:24px 0 0;justify-self:stretch}
+  .hero-visual img{width:100%;height:auto;aspect-ratio:1.7/1;object-fit:cover}
+  .hero-visual figcaption{font-size:.72rem;text-align:center}
+}
+
 </style>
 </head>
 <body>
